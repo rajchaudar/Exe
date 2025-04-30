@@ -1,29 +1,22 @@
 (function () {
-    let formatsCache = null;
     let videoUrl = null;
   
-    // Inject Download Button and Modal
     function injectDownloadUI() {
       if (document.getElementById('yt-download-btn')) return;
   
       let target = document.querySelector('#top-level-buttons-computed');
-
-      // If not found, check if it's a Shorts page
       if (!target && location.pathname.startsWith('/shorts/')) {
-        target = document.querySelector('ytd-reel-player-header-renderer #menu'); // Shorts action button container
+        target = document.querySelector('ytd-reel-player-header-renderer #menu');
       }
-      
-      // Still not found? Exit
       if (!target) return;
   
-      // Download Button
+      // Create download button
       const btn = document.createElement('button');
       btn.id = 'yt-download-btn';
       btn.innerText = '⬇ Download';
       btn.style.cssText = `
         background: rgba(207, 207, 207, 0.33);
         backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
         padding: 8px 14px;
         margin-left: 8px;
         border-radius: 18px;
@@ -52,7 +45,6 @@
         <div style="
           background: rgba(255, 255, 255, 0.1);
           backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
           padding: 24px;
           border-radius: 16px;
           width: 340px;
@@ -64,9 +56,13 @@
           <button id="close-modal" style="position:absolute; right:12px; top:10px; border:none; font-size:22px; cursor:pointer; background:none; color:white;">&times;</button>
           <h3 style="margin-bottom:14px; font-weight:600; font-size:18px;">Download This Video</h3>
           <label style="display:block; margin-bottom:6px;">🎞 Video Quality</label>
-          <select id="video-select" style="width:100%;margin-bottom:14px;padding:6px;border-radius:8px;border:none;"></select>
+          <select id="video-select" style="width:100%;margin-bottom:14px;padding:6px;border-radius:8px;border:none;">
+            <option>Loading...</option>
+          </select>
           <label style="display:block; margin-bottom:6px;">🎧 Audio Quality</label>
-          <select id="audio-select" style="width:100%;margin-bottom:16px;padding:6px;border-radius:8px;border:none;"></select>
+          <select id="audio-select" style="width:100%;margin-bottom:16px;padding:6px;border-radius:8px;border:none;">
+            <option>Loading...</option>
+          </select>
           <button id="start-download" style="
             width: 100%;
             padding: 10px;
@@ -83,46 +79,21 @@
       `;
       document.body.appendChild(modal);
   
-      // Download Button Clicked
+      // Show modal and fetch formats when clicked
       btn.onclick = async () => {
-        const modal = document.getElementById('download-modal');
-        const statusMsg = document.getElementById('status-message');
-        modal.style.display = 'flex';
-  
-        // Reset and show loading
-        statusMsg.textContent = '⏳ Fetching formats...';
-        document.getElementById('video-select').innerHTML = '';
-        document.getElementById('audio-select').innerHTML = '';
-  
-        try {
-          videoUrl = location.href.split('&')[0];
-          const res = await fetch('http://localhost:3000/api/formats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoUrl }),
-          });
-  
-          formatsCache = await res.json();
-  
-          if (Array.isArray(formatsCache) && formatsCache.length > 0) {
-            populateFormats();
-            statusMsg.textContent = '';
-          } else {
-            statusMsg.textContent = '⚠️ No formats found.';
-          }
-        } catch (err) {
-          console.error(err);
-          statusMsg.textContent = '❌ Failed to fetch formats.';
-        }
+        document.getElementById('download-modal').style.display = 'flex';
+        document.getElementById('status-message').textContent = '';
+        document.getElementById('video-select').innerHTML = `<option>Loading...</option>`;
+        document.getElementById('audio-select').innerHTML = `<option>Loading...</option>`;
+        await fetchAndPopulateFormats();
       };
   
-      // Close Modal
+      // Close modal
       document.getElementById('close-modal').onclick = () => {
         document.getElementById('download-modal').style.display = 'none';
-        document.getElementById('status-message').textContent = '';
       };
   
-      // Start Download
+      // Start download
       document.getElementById('start-download').onclick = () => {
         const videoFormatId = document.getElementById('video-select').value || null;
         const audioFormatId = document.getElementById('audio-select').value || null;
@@ -135,10 +106,9 @@
         }
   
         btn.disabled = true;
-        btn.setAttribute('disabled', 'disabled');
+        btn.textContent = '⬇ Downloading...';
         btn.style.opacity = '0.6';
         btn.style.cursor = 'not-allowed';
-        btn.textContent = '⬇ Downloading...';
   
         const xhr = new XMLHttpRequest();
         xhr.open('POST', 'http://localhost:3000/api/download', true);
@@ -157,54 +127,58 @@
             statusMsg.textContent = '❌ Download failed.';
           }
           btn.disabled = false;
-          btn.removeAttribute('disabled');
+          btn.textContent = '⬇ Start Download';
           btn.style.opacity = '1';
           btn.style.cursor = 'pointer';
-          btn.textContent = '⬇ Start Download';
         };
   
         xhr.onerror = () => {
           statusMsg.textContent = '❌ Network error.';
           btn.disabled = false;
-          btn.removeAttribute('disabled');
+          btn.textContent = '⬇ Start Download';
           btn.style.opacity = '1';
           btn.style.cursor = 'pointer';
-          btn.textContent = '⬇ Start Download';
         };
   
         xhr.send(JSON.stringify({ videoUrl, videoFormatId, audioFormatId }));
       };
     }
   
-    // Populate Format Options
-    function populateFormats() {
-      const videoSelect = document.getElementById('video-select');
-      const audioSelect = document.getElementById('audio-select');
-      videoSelect.innerHTML = '';
-      audioSelect.innerHTML = '';
+    async function fetchAndPopulateFormats() {
+      try {
+        videoUrl = location.href.split('&')[0];
+        const res = await fetch('http://localhost:3000/api/formats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl }),
+        });
+        const formats = await res.json();
   
-      formatsCache
-        .filter(f => f.type === 'video-only')
-        .forEach(f => {
+        const videoSelect = document.getElementById('video-select');
+        const audioSelect = document.getElementById('audio-select');
+        videoSelect.innerHTML = '';
+        audioSelect.innerHTML = '';
+  
+        formats.filter(f => f.type === 'video-only').forEach(f => {
           const opt = document.createElement('option');
           opt.value = f.format_id;
           opt.textContent = `${f.resolution} - ${f.note}`;
           videoSelect.appendChild(opt);
         });
   
-      formatsCache
-        .filter(f => f.type === 'audio-only')
-        .forEach(f => {
+        formats.filter(f => f.type === 'audio-only').forEach(f => {
           const opt = document.createElement('option');
           opt.value = f.format_id;
           opt.textContent = `${f.resolution} - ${f.note}`;
           audioSelect.appendChild(opt);
         });
+      } catch (err) {
+        document.getElementById('status-message').textContent = '⚠️ Failed to fetch formats.';
+      }
     }
   
-    // YouTube SPA Page Observer
     const observer = new MutationObserver(() => {
-      if (document.querySelector('#top-level-buttons-computed')) {
+      if (document.querySelector('#top-level-buttons-computed') || location.pathname.startsWith('/shorts/')) {
         injectDownloadUI();
       }
     });
@@ -218,11 +192,7 @@
     setInterval(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href;
-        formatsCache = null;
-        setTimeout(() => {
-          const btn = document.getElementById('yt-download-btn');
-          if (btn) btn.remove(); // Remove old button to re-inject
-        }, 1000);
+        setTimeout(injectDownloadUI, 1000);
       }
     }, 1000);
   })();
