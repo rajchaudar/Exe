@@ -30,7 +30,6 @@ This project integrates a Chrome browser extension with a Node.js backend to ena
 Make sure you have the following installed on your system:
 
 - ✅ [Node.js](https://nodejs.org/en) (v14+ recommended)
-- ✅ [Python](https://python.org/)
 - ✅ [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 - ✅ [ffmpeg](https://ffmpeg.org/)
 
@@ -190,4 +189,4 @@ GitHub: [@rajchaudar](https://github.com/rajchaudar)
 ## 📬 Got Issues?
 
 Create an issue or pull request at:  
-👉 [https://github.com/rajchaudar](https://github.com/rajchaudar)
+👉 [https://github.com/rajchaudar](https://github.com/rajchaudar/Exe)
